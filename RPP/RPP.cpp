@@ -1,47 +1,87 @@
 #include <iostream>
 #include <vector>
-#include <omp.h>
-using namespace std;
+#include <iomanip> /
+#include <omp.h>   
+#include <cmath>   
+#include <cstdlib>
 
-double determinant(vector<vector<double>> matrix, int n) {
-    if (n == 1) return matrix[0][0];
-    if (n == 2)
-        return matrix[0][0] * matrix[1][1] - matrix[0][1] * matrix[1][0];
 
-    double det = 0.0;
+void generate_matrix(std::vector<std::vector<double>>& matrix, int n) {
+    srand(12345); 
+    for (int i = 0; i < n; ++i) {
+        for (int j = 0; j < n; ++j) {
+            matrix[i][j] = static_cast<double>(rand() % 1000) / 100.0 - 5.0; 
+        }
+    }
+}
 
-#pragma omp parallel for reduction(+:det)
-    for (int p = 0; p < n; ++p) {
-        vector<vector<double>> submatrix(n - 1, vector<double>(n - 1));
-        for (int i = 1; i < n; ++i) {
-            int colIdx = 0;
-            for (int j = 0; j < n; ++j) {
-                if (j == p) continue;
-                submatrix[i - 1][colIdx++] = matrix[i][j];
+
+double calculate_determinant(std::vector<std::vector<double>>& matrix, int n) {
+    double det = 1.0;
+    int sign = 1;
+
+    for (int k = 0; k < n; ++k) {
+        
+        int pivot_row = k;
+        for (int i = k + 1; i < n; ++i) {
+            if (std::abs(matrix[i][k]) > std::abs(matrix[pivot_row][k])) {
+                pivot_row = i;
             }
         }
-        double sign = (p % 2 == 0) ? 1 : -1;
-        det += sign * matrix[0][p] * determinant(submatrix, n - 1);
+
+        if (std::abs(matrix[pivot_row][k]) < 1e-9) { 
+            return 0.0;
+        }
+
+        
+        if (pivot_row != k) {
+            std::swap(matrix[k], matrix[pivot_row]);
+            sign *= -1; 
+        }
+
+        det *= matrix[k][k]; 
+
+        
+#pragma omp parallel for
+        for (int i = k + 1; i < n; ++i) {
+            double factor = matrix[i][k] / matrix[k][k];
+            for (int j = k; j < n; ++j) {
+                matrix[i][j] -= factor * matrix[k][j];
+            }
+        }
     }
-    return det;
+
+    return det * sign;
 }
 
 int main() {
     int n;
-    cout << "Enter matrix size (n x n): ";
-    cin >> n;
-    vector<vector<double>> matrix(n, vector<double>(n));
+    int num_threads;
 
-    cout << "Enter matrix values row by row:\n";
-    for (int i = 0; i < n; i++)
-        for (int j = 0; j < n; j++)
-            cin >> matrix[i][j];
+    std::cout << "Enter matrix size (N x N): ";
+    std::cin >> n;
 
-    double start = omp_get_wtime();
-    double result = determinant(matrix, n);
-    double end = omp_get_wtime();
+    std::cout << "Enter number of threads: ";
+    std::cin >> num_threads;
 
-    cout << "Determinant: " << result << endl;
-    cout << "Time: " << (end - start) << " seconds" << endl;
+    omp_set_num_threads(num_threads); 
+
+    
+    std::vector<std::vector<double>> matrix(n, std::vector<double>(n));
+
+  
+    double start_gen_time = omp_get_wtime();
+    generate_matrix(matrix, n);
+    double end_gen_time = omp_get_wtime();
+    std::cerr << std::fixed << std::setprecision(6) << (end_gen_time - start_gen_time) << " s - finished data generation\n";
+
+    
+    double start_det_time = omp_get_wtime();
+    double determinant = calculate_determinant(matrix, n);
+    double end_det_time = omp_get_wtime();
+
+    std::cout << "Determinant: " << std::fixed << std::setprecision(6) << determinant << std::endl;
+    std::cerr << std::fixed << std::setprecision(6) << (end_det_time - start_det_time) << " s - finished computation\n";
+
     return 0;
 }
