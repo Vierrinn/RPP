@@ -1,87 +1,68 @@
 #include <iostream>
 #include <vector>
-#include <iomanip> /
-#include <omp.h>   
-#include <cmath>   
 #include <cstdlib>
+#include <ctime>
+#include <cmath>
+#include <omp.h>
 
-
-void generate_matrix(std::vector<std::vector<double>>& matrix, int n) {
-    srand(12345); 
-    for (int i = 0; i < n; ++i) {
-        for (int j = 0; j < n; ++j) {
-            matrix[i][j] = static_cast<double>(rand() % 1000) / 100.0 - 5.0; 
-        }
-    }
-}
-
-
-double calculate_determinant(std::vector<std::vector<double>>& matrix, int n) {
+double MatrixDeterminant(int nDim, std::vector<double>& matrix) {
     double det = 1.0;
-    int sign = 1;
-
-    for (int k = 0; k < n; ++k) {
-        
-        int pivot_row = k;
-        for (int i = k + 1; i < n; ++i) {
-            if (std::abs(matrix[i][k]) > std::abs(matrix[pivot_row][k])) {
-                pivot_row = i;
+    for (int k = 0; k < nDim - 1; ++k) {
+        double maxElem = std::abs(matrix[k * nDim + k]);
+        int maxRow = k;
+        for (int i = k + 1; i < nDim; ++i) {
+            if (std::abs(matrix[i * nDim + k]) > maxElem) {
+                maxElem = std::abs(matrix[i * nDim + k]);
+                maxRow = i;
             }
         }
 
-        if (std::abs(matrix[pivot_row][k]) < 1e-9) { 
-            return 0.0;
+        if (maxRow != k) {
+            for (int i = k; i < nDim; ++i)
+                std::swap(matrix[k * nDim + i], matrix[maxRow * nDim + i]);
+            det *= -1.0;
         }
 
-        
-        if (pivot_row != k) {
-            std::swap(matrix[k], matrix[pivot_row]);
-            sign *= -1; 
-        }
+        if (matrix[k * nDim + k] == 0.0) return 0.0;
 
-        det *= matrix[k][k]; 
-
-        
 #pragma omp parallel for
-        for (int i = k + 1; i < n; ++i) {
-            double factor = matrix[i][k] / matrix[k][k];
-            for (int j = k; j < n; ++j) {
-                matrix[i][j] -= factor * matrix[k][j];
+        for (int j = k + 1; j < nDim; ++j) {
+            double factor = -matrix[j * nDim + k] / matrix[k * nDim + k];
+            for (int i = k; i < nDim; ++i) {
+                matrix[j * nDim + i] += factor * matrix[k * nDim + i];
             }
         }
     }
 
-    return det * sign;
+    for (int i = 0; i < nDim; ++i)
+        det *= matrix[i * nDim + i];
+
+    return det;
 }
 
 int main() {
     int n;
-    int num_threads;
-
-    std::cout << "Enter matrix size (N x N): ";
+    std::cout << "Enter the size of the matrix (n x n): ";
     std::cin >> n;
 
-    std::cout << "Enter number of threads: ";
-    std::cin >> num_threads;
-
-    omp_set_num_threads(num_threads); 
-
-    
     std::vector<std::vector<double>> matrix(n, std::vector<double>(n));
+    srand(static_cast<unsigned>(time(nullptr)));
 
-  
-    double start_gen_time = omp_get_wtime();
-    generate_matrix(matrix, n);
-    double end_gen_time = omp_get_wtime();
-    std::cerr << std::fixed << std::setprecision(6) << (end_gen_time - start_gen_time) << " s - finished data generation\n";
+    for (auto& row : matrix)
+        for (auto& val : row)
+            val = static_cast<double>(rand() % 20 + 1);
 
-    
-    double start_det_time = omp_get_wtime();
-    double determinant = calculate_determinant(matrix, n);
-    double end_det_time = omp_get_wtime();
+    std::vector<double> flatMatrix(n * n);
+    for (int i = 0; i < n; ++i)
+        for (int j = 0; j < n; ++j)
+            flatMatrix[i * n + j] = matrix[i][j];
 
-    std::cout << "Determinant: " << std::fixed << std::setprecision(6) << determinant << std::endl;
-    std::cerr << std::fixed << std::setprecision(6) << (end_det_time - start_det_time) << " s - finished computation\n";
+    double startTime = omp_get_wtime();
+    double determinant = MatrixDeterminant(n, flatMatrix);
+    double endTime = omp_get_wtime();
+
+    std::cout << "Determinant: " << determinant << std::endl;
+    std::cout << "Time elapsed: " << endTime - startTime << " seconds" << std::endl;
 
     return 0;
 }
