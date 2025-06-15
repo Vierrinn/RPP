@@ -5,7 +5,7 @@
 #include <cmath>
 #include <omp.h>
 
-// ‘ункц≥€ дл€ обчисленн€ визначника методом √ауса
+
 double calculateDeterminant(std::vector<std::vector<double>>& matrix, int n) {
     double det = 1.0;
 
@@ -20,7 +20,7 @@ double calculateDeterminant(std::vector<std::vector<double>>& matrix, int n) {
             }
         }
 
-        if (maxElem < 1e-9) return 0.0; // сингул€рна матриц€
+        if (maxElem < 1e-9) return 0.0; 
 
         if (maxRow != k) {
             std::swap(matrix[k], matrix[maxRow]);
