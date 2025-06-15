@@ -5,64 +5,67 @@
 #include <cmath>
 #include <omp.h>
 
-double MatrixDeterminant(int nDim, std::vector<double>& matrix) {
+// ‘ункц≥€ дл€ обчисленн€ визначника методом √ауса
+double calculateDeterminant(std::vector<std::vector<double>>& matrix, int n) {
     double det = 1.0;
-    for (int k = 0; k < nDim - 1; ++k) {
-        double maxElem = std::abs(matrix[k * nDim + k]);
+
+    for (int k = 0; k < n; ++k) {
         int maxRow = k;
-        for (int i = k + 1; i < nDim; ++i) {
-            if (std::abs(matrix[i * nDim + k]) > maxElem) {
-                maxElem = std::abs(matrix[i * nDim + k]);
+        double maxElem = std::abs(matrix[k][k]);
+
+        for (int i = k + 1; i < n; ++i) {
+            if (std::abs(matrix[i][k]) > maxElem) {
+                maxElem = std::abs(matrix[i][k]);
                 maxRow = i;
             }
         }
 
+        if (maxElem < 1e-9) return 0.0; // сингул€рна матриц€
+
         if (maxRow != k) {
-            for (int i = k; i < nDim; ++i)
-                std::swap(matrix[k * nDim + i], matrix[maxRow * nDim + i]);
+            std::swap(matrix[k], matrix[maxRow]);
             det *= -1.0;
         }
 
-        if (matrix[k * nDim + k] == 0.0) return 0.0;
+        det *= matrix[k][k];
 
 #pragma omp parallel for
-        for (int j = k + 1; j < nDim; ++j) {
-            double factor = -matrix[j * nDim + k] / matrix[k * nDim + k];
-            for (int i = k; i < nDim; ++i) {
-                matrix[j * nDim + i] += factor * matrix[k * nDim + i];
+        for (int i = k + 1; i < n; ++i) {
+            double factor = matrix[i][k] / matrix[k][k];
+            for (int j = k; j < n; ++j) {
+                matrix[i][j] -= factor * matrix[k][j];
             }
         }
     }
-
-    for (int i = 0; i < nDim; ++i)
-        det *= matrix[i * nDim + i];
 
     return det;
 }
 
 int main() {
-    int n;
+    int n, threads;
+
     std::cout << "Enter the size of the matrix (n x n): ";
     std::cin >> n;
 
+    std::cout << "Enter the number of threads: ";
+    std::cin >> threads;
+
+    omp_set_num_threads(threads);
+
     std::vector<std::vector<double>> matrix(n, std::vector<double>(n));
+
     srand(static_cast<unsigned>(time(nullptr)));
 
     for (auto& row : matrix)
         for (auto& val : row)
             val = static_cast<double>(rand() % 20 + 1);
 
-    std::vector<double> flatMatrix(n * n);
-    for (int i = 0; i < n; ++i)
-        for (int j = 0; j < n; ++j)
-            flatMatrix[i * n + j] = matrix[i][j];
+    double start = omp_get_wtime();
+    double det = calculateDeterminant(matrix, n);
+    double end = omp_get_wtime();
 
-    double startTime = omp_get_wtime();
-    double determinant = MatrixDeterminant(n, flatMatrix);
-    double endTime = omp_get_wtime();
-
-    std::cout << "Determinant: " << determinant << std::endl;
-    std::cout << "Time elapsed: " << endTime - startTime << " seconds" << std::endl;
+    std::cout << "Determinant: " << det << "\n";
+    std::cout << "Time elapsed: " << end - start << " seconds\n";
 
     return 0;
 }
